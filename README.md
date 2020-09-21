@@ -121,7 +121,7 @@ $ source devel/setup.bash
 ## Setting up a UR robot for ur_robot_driver
 ### Prepare the robot
 For using the *ur_robot_driver* with a real robot you need to install the
-**externalcontrol-1.0.2.urcap** which can be found inside the **resources** folder of this driver.
+**externalcontrol-1.0.4.urcap** which can be found inside the **resources** folder of this driver.
 
 **Note**: For installing this URCap a minimal PolyScope version of 3.7 or 5.1 (in case of e-Series) is
 necessary.
@@ -181,8 +181,8 @@ For more information on the launch file's parameters see its own documentation.
 
 Once the robot driver is started, load the [previously generated program](#prepare-the-robot) on the
 robot panel that will start the *External Control* program node and execute it. From that moment on
-the robot is fully functional. You can make use of the *Pause* function or even *Stop* (◾) the
-program.  Simply press the *Play* button (▶) again and the ROS driver will reconnect.
+the robot is fully functional. You can make use of the *Pause* function or even *Stop* (:stop_button:) the
+program.  Simply press the *Play* button (:arrow_forward:) again and the ROS driver will reconnect.
 
 Inside the ROS terminal running the driver you should see the output `Robot ready to receive control commands.`
 
