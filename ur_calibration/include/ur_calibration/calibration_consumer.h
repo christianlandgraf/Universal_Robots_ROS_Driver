@@ -38,7 +38,7 @@ namespace ur_calibration
 class CalibrationConsumer : public urcl::comm::IConsumer<urcl::primary_interface::PrimaryPackage>
 {
 public:
-  CalibrationConsumer();
+  CalibrationConsumer(std::string dh_config_filename);
   virtual ~CalibrationConsumer() = default;
 
   virtual bool consume(std::shared_ptr<urcl::primary_interface::PrimaryPackage> product);
@@ -52,6 +52,7 @@ public:
 
 private:
   bool calibrated_;
+  std::string dh_config_filename_;
   YAML::Node calibration_parameters_;
 };
 }  // namespace ur_calibration

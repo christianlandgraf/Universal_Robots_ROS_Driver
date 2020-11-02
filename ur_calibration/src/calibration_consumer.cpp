@@ -26,10 +26,26 @@
 //----------------------------------------------------------------------
 
 #include <ur_calibration/calibration_consumer.h>
+#include <filesystem>
+
+#ifndef __has_include
+  static_assert(false, "__has_include not supported");
+#else
+#  if __has_include(<experimental/filesystem>)
+#   include <experimental/filesystem>
+    namespace fs = std::experimental::filesystem;
+#  elif __has_include(<filesystem>)
+#    include <filesystem>
+     namespace fs = std::filesystem;
+#  elif __has_include(<boost/filesystem.hpp>)
+#   include <boost/filesystem.hpp>
+    namespace fs = boost::filesystem;
+#  endif
+#endif
 
 namespace ur_calibration
 {
-CalibrationConsumer::CalibrationConsumer() : calibrated_(false)
+CalibrationConsumer::CalibrationConsumer(std::string dh_config_filename) : calibrated_(false), dh_config_filename_(dh_config_filename)
 {
 }
 
@@ -38,13 +54,37 @@ bool CalibrationConsumer::consume(std::shared_ptr<urcl::primary_interface::Prima
   auto kin_info = std::dynamic_pointer_cast<urcl::primary_interface::KinematicsInfo>(product);
   if (kin_info != nullptr)
   {
-    LOG_INFO("%s", product->toString().c_str());
     DHRobot my_robot;
-    for (size_t i = 0; i < kin_info->dh_a_.size(); ++i)
+    if (std::filesystem::exists(dh_config_filename_))
     {
-      my_robot.segments_.push_back(
-          DHSegment(kin_info->dh_d_[i], kin_info->dh_a_[i], kin_info->dh_theta_[i], kin_info->dh_alpha_[i]));
+      YAML::Node dh_config_file = YAML::LoadFile(dh_config_filename_);
+      try {
+        for (int i = 1; i <= 6; i++){
+          std::string joint_name = "joint_" + std::to_string(i);
+          my_robot.segments_.push_back(
+            DHSegment(dh_config_file["dh_parameter"][joint_name]["d"].as<double>(),
+                      dh_config_file["dh_parameter"][joint_name]["a"].as<double>(),
+                      dh_config_file["dh_parameter"][joint_name]["theta"].as<double>(),
+                      dh_config_file["dh_parameter"][joint_name]["alpha"].as<double>()));
+        }
+      }
+      catch (YAML::TypedBadConversion<double> ye)
+      {
+        ROS_ERROR_STREAM("Could not load yaml file correctly.");
+        ros::shutdown();
+      }
     }
+    else
+    {
+      ROS_INFO_STREAM("Loading dh values from UR controller");
+      LOG_INFO("%s", product->toString().c_str());
+      for (size_t i = 0; i < kin_info->dh_a_.size(); ++i)
+      {
+        my_robot.segments_.push_back(
+            DHSegment(kin_info->dh_d_[i], kin_info->dh_a_[i], kin_info->dh_theta_[i], kin_info->dh_alpha_[i]));
+      }
+    }
+
     Calibration calibration(my_robot);
     calibration.correctChain();
 

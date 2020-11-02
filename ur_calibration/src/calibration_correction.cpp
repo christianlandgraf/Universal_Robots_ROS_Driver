@@ -68,6 +68,9 @@ public:
 
       // The target file where the calibration data is written to
       output_filename_ = getRequiredParameter<std::string>("output_filename");
+
+      // Customized dh parameters
+      dh_config_filename_ = getOptionalParameter<std::string>("dh_config_filename");
     }
     catch (const ParamaterMissingException& e)
     {
@@ -83,7 +86,7 @@ public:
     comm::URStream<PrimaryPackage> stream(robot_ip_, UR_PRIMARY_PORT);
     primary_interface::PrimaryParser parser;
     comm::URProducer<PrimaryPackage> prod(stream, parser);
-    CalibrationConsumer consumer;
+    CalibrationConsumer consumer(dh_config_filename_);
 
     comm::INotifier notifier;
 
@@ -150,9 +153,22 @@ private:
     return ret_val;
   }
 
+  template <typename T>
+  T getOptionalParameter(const std::string& param_name) const
+  {
+    T ret_val;
+    if (nh_.hasParam(param_name))
+    {
+      nh_.getParam(param_name, ret_val);
+    }    
+    return ret_val;
+  }
+
+
   ros::NodeHandle nh_;
   std::string robot_ip_;
   std::string output_filename_;
+  std::string dh_config_filename_;
 
   std::unique_ptr<YAML::Node> calibration_data_;
 };

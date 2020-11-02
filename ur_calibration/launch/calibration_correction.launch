@@ -2,9 +2,11 @@
 <launch>
   <arg name="robot_ip" doc="The IP address at which the robot is reachable."/>
   <arg name="target_filename" default="robot_calibration.yaml" doc="The extracted calibration information will be written to this target file."/>
+  <arg name="dh_config_filename" default="" doc="A custom configuration of DH Parameters instead of the ones in the UR controller."/>
 
   <node name="calibration_correction" pkg="ur_calibration" type="calibration_correction" respawn="false" output="screen">
     <param name="robot_ip" value="$(arg robot_ip)"/>
     <param name="output_filename" value="$(arg target_filename)"/>
+    <param name="dh_config_filename" value="$(arg dh_config_filename)"/>
   </node>
 </launch>
