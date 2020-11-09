@@ -26,7 +26,6 @@
 //----------------------------------------------------------------------
 
 #include <ur_calibration/calibration_consumer.h>
-#include <filesystem>
 
 #ifndef __has_include
   static_assert(false, "__has_include not supported");
