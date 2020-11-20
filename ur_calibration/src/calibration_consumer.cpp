@@ -27,19 +27,15 @@
 
 #include <ur_calibration/calibration_consumer.h>
 
-#ifndef __has_include
-  static_assert(false, "__has_include not supported");
-#else
-#  if __has_include(<experimental/filesystem>)
-#   include <experimental/filesystem>
-    namespace fs = std::experimental::filesystem;
-#  elif __has_include(<filesystem>)
-#    include <filesystem>
-     namespace fs = std::filesystem;
-#  elif __has_include(<boost/filesystem.hpp>)
-#   include <boost/filesystem.hpp>
-    namespace fs = boost::filesystem;
-#  endif
+#if __has_include(<filesystem>)
+#  include <filesystem>
+   namespace fs = std::filesystem;
+#elif __has_include(<experimental/filesystem>)
+# include <experimental/filesystem>
+  namespace fs = std::experimental::filesystem;
+#elif __has_include(<boost/filesystem.hpp>)
+# include <boost/filesystem.hpp>
+  namespace fs = boost::filesystem;
 #endif
 
 namespace ur_calibration
@@ -54,7 +50,7 @@ bool CalibrationConsumer::consume(std::shared_ptr<urcl::primary_interface::Prima
   if (kin_info != nullptr)
   {
     DHRobot my_robot;
-    if (std::filesystem::exists(dh_config_filename_))
+    if (fs::exists(dh_config_filename_))
     {
       YAML::Node dh_config_file = YAML::LoadFile(dh_config_filename_);
       try {
