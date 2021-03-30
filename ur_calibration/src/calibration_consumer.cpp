@@ -73,7 +73,7 @@ bool CalibrationConsumer::consume(std::shared_ptr<urcl::primary_interface::Prima
     else
     {
       ROS_INFO_STREAM("Loading dh values from UR controller");
-      LOG_INFO("%s", product->toString().c_str());
+      ROS_INFO("%s", product->toString().c_str());
       for (size_t i = 0; i < kin_info->dh_a_.size(); ++i)
       {
         my_robot.segments_.push_back(
