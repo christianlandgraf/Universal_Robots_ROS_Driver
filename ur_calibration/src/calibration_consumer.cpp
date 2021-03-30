@@ -49,6 +49,7 @@ bool CalibrationConsumer::consume(std::shared_ptr<urcl::primary_interface::Prima
   auto kin_info = std::dynamic_pointer_cast<urcl::primary_interface::KinematicsInfo>(product);
   if (kin_info != nullptr)
   {
+    ROS_INFO("%s", product->toString().c_str());
     DHRobot my_robot;
     if (fs::exists(dh_config_filename_))
     {
