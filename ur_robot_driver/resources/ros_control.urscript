@@ -1,5 +1,7 @@
 {{BEGIN_REPLACE}}
 
+# HEADER_BEGIN
+
 global steptime = get_steptime()
 
 textmsg("ExternalControl: steptime=", steptime)
@@ -93,6 +95,10 @@ thread speedThread():
   stopj(5.0)
 end
 
+# HEADER_END
+
+# NODE_CONTROL_LOOP_BEGINS
+
 socket_open("{{SERVER_IP_REPLACE}}", {{SERVER_PORT_REPLACE}}, "reverse_socket")
 
 control_mode = MODE_UNINITIALIZED
@@ -103,7 +109,6 @@ textmsg("ExternalControl: External control active")
 keepalive = params_mult[1]
 while keepalive > 0 and control_mode > MODE_STOPPED:
   enter_critical
-  socket_send_line(1, "reverse_socket")
   params_mult = socket_read_binary_integer(1+6+1, "reverse_socket", 0.02) # steptime could work as well, but does not work in simulation
   if params_mult[0] > 0:
     keepalive = params_mult[1]
@@ -134,3 +139,5 @@ control_mode = MODE_STOPPED
 join thread_move
 textmsg("ExternalControl: All threads ended")
 socket_close("reverse_socket")
+
+# NODE_CONTROL_LOOP_ENDS
