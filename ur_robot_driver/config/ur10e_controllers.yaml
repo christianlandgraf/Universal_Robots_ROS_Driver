@@ -17,6 +17,11 @@ joint_state_controller:
    type:         joint_state_controller/JointStateController
    publish_rate: *loop_hz
 
+# Publish all target joint states ----------------------------------
+target_joint_state_controller:
+   type:         joint_state_controller/JointStateController
+   publish_rate: *loop_hz
+
 # Publish wrench ----------------------------------
 force_torque_sensor_controller:
    type:         force_torque_sensor_controller/ForceTorqueSensorController

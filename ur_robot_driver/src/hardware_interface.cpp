@@ -55,6 +55,9 @@ HardwareInterface::HardwareInterface()
   , joint_positions_{ { 0, 0, 0, 0, 0, 0 } }
   , joint_velocities_{ { 0, 0, 0, 0, 0, 0 } }
   , joint_efforts_{ { 0, 0, 0, 0, 0, 0 } }
+  , target_joint_positions_{ { 0, 0, 0, 0, 0, 0 } }
+  , target_joint_velocities_{ { 0, 0, 0, 0, 0, 0 } }
+  , target_joint_efforts_{ { 0, 0, 0, 0, 0, 0 } }
   , standard_analog_input_{ { 0, 0 } }
   , standard_analog_output_{ { 0, 0 } }
   , joint_names_(6)
@@ -302,6 +305,10 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
     js_interface_.registerHandle(hardware_interface::JointStateHandle(joint_names_[i], &joint_positions_[i],
                                                                       &joint_velocities_[i], &joint_efforts_[i]));
 
+    // std::string target_joint_name = "target_" + joint_names_[i];
+    target_js_interface_.registerHandle(hardware_interface::JointStateHandle(joint_names_[i], &target_joint_positions_[i],
+                                                                      &target_joint_velocities_[i], &target_joint_efforts_[i]));
+
     // Create joint position control interface
     pj_interface_.registerHandle(
         hardware_interface::JointHandle(js_interface_.getHandle(joint_names_[i]), &joint_position_command_[i]));
@@ -324,6 +331,7 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
 
   // Register interfaces
   registerInterface(&js_interface_);
+  registerInterface(&target_js_interface_);
   registerInterface(&spj_interface_);
   registerInterface(&pj_interface_);
   registerInterface(&vj_interface_);
@@ -333,6 +341,7 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
   registerInterface(&robot_status_interface_);
 
   tcp_pose_pub_.reset(new realtime_tools::RealtimePublisher<tf2_msgs::TFMessage>(root_nh, "/tf", 100));
+  tcp_speed_pub_.reset(new realtime_tools::RealtimePublisher<geometry_msgs::TwistStamped>(root_nh, "/tcp_speed", 100));
   io_pub_.reset(new realtime_tools::RealtimePublisher<ur_msgs::IOStates>(robot_hw_nh, "io_states", 1));
   io_pub_->msg_.digital_in_states.resize(actual_dig_in_bits_.size());
   io_pub_->msg_.digital_out_states.resize(actual_dig_out_bits_.size());
@@ -444,11 +453,14 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
     packet_read_ = true;
     readData(data_pkg, "actual_q", joint_positions_);
     readData(data_pkg, "actual_qd", joint_velocities_);
+    readData(data_pkg, "target_q", target_joint_positions_);
+    readData(data_pkg, "target_qd", target_joint_velocities_);
     readData(data_pkg, "target_speed_fraction", target_speed_fraction_);
     readData(data_pkg, "speed_scaling", speed_scaling_);
     readData(data_pkg, "runtime_state", runtime_state_);
     readData(data_pkg, "actual_TCP_force", fts_measurements_);
     readData(data_pkg, "actual_TCP_pose", tcp_pose_);
+    readData(data_pkg, "actual_TCP_speed", tcp_speed_);
     readData(data_pkg, "standard_analog_input0", standard_analog_input_[0]);
     readData(data_pkg, "standard_analog_input1", standard_analog_input_[1]);
     readData(data_pkg, "standard_analog_output0", standard_analog_output_[0]);
@@ -464,6 +476,7 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
     readBitsetData<uint32_t>(data_pkg, "robot_status_bits", robot_status_bits_);
     readBitsetData<uint32_t>(data_pkg, "safety_status_bits", safety_status_bits_);
     readData(data_pkg, "actual_current", joint_efforts_);
+    readData(data_pkg, "target_current", target_joint_efforts_);
     readBitsetData<uint64_t>(data_pkg, "actual_digital_input_bits", actual_dig_in_bits_);
     readBitsetData<uint64_t>(data_pkg, "actual_digital_output_bits", actual_dig_out_bits_);
     readBitsetData<uint32_t>(data_pkg, "analog_io_types", analog_io_types_);
@@ -478,6 +491,7 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
     extractToolPose(time);
     transformForceTorque();
     publishPose();
+    publishVelocity(time);
     publishRobotAndSafetyMode();
 
     // pausing state follows runtime state when pausing
@@ -718,6 +732,25 @@ void HardwareInterface::publishPose()
     }
   }
 }
+
+void HardwareInterface::publishVelocity(const ros::Time& timestamp)
+{
+  if (tcp_speed_pub_)
+  {
+    if (tcp_speed_pub_->trylock())
+    {
+      tcp_speed_pub_->msg_.header.stamp = timestamp;
+      tcp_speed_pub_->msg_.twist.linear.x = tcp_speed_[0];
+      tcp_speed_pub_->msg_.twist.linear.y = tcp_speed_[1];
+      tcp_speed_pub_->msg_.twist.linear.z = tcp_speed_[2];
+      tcp_speed_pub_->msg_.twist.angular.x = tcp_speed_[3];
+      tcp_speed_pub_->msg_.twist.angular.y = tcp_speed_[4];
+      tcp_speed_pub_->msg_.twist.angular.z = tcp_speed_[5];
+      tcp_speed_pub_->unlockAndPublish();
+    }
+  }
+}
+
 
 void HardwareInterface::extractRobotStatus()
 {

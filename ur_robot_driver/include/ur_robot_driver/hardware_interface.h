@@ -39,6 +39,7 @@
 #include <realtime_tools/realtime_publisher.h>
 #include <tf2_msgs/TFMessage.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <geometry_msgs/TwistStamped.h>
 
 #include <ur_msgs/IOStates.h>
 #include <ur_msgs/ToolDataMsg.h>
@@ -55,6 +56,16 @@
 #include <ur_dashboard_msgs/SafetyMode.h>
 
 #include <industrial_robot_status_interface/industrial_robot_status_interface.h>
+
+
+namespace hardware_interface 
+{
+  class TargetJointStateHandle: public JointStateInterface 
+  {
+    using JointStateInterface::JointStateInterface;
+  };
+
+}
 
 namespace ur_driver
 {
@@ -177,6 +188,12 @@ protected:
    */
   void publishPose();
 
+  /*!
+   * \brief Publishes the tool velocity
+   */
+  void publishVelocity(const ros::Time& timestamp);
+
+
   void publishIOData();
   void publishToolData();
   void publishRobotAndSafetyMode();
@@ -218,6 +235,7 @@ protected:
   ros::ServiceServer set_payload_srv_;
 
   hardware_interface::JointStateInterface js_interface_;
+  hardware_interface::TargetJointStateHandle target_js_interface_;
   ur_controllers::ScaledPositionJointInterface spj_interface_;
   hardware_interface::PositionJointInterface pj_interface_;
   ur_controllers::SpeedScalingInterface speedsc_interface_;
@@ -230,8 +248,12 @@ protected:
   urcl::vector6d_t joint_positions_;
   urcl::vector6d_t joint_velocities_;
   urcl::vector6d_t joint_efforts_;
+  urcl::vector6d_t target_joint_positions_;
+  urcl::vector6d_t target_joint_velocities_;
+  urcl::vector6d_t target_joint_efforts_;
   urcl::vector6d_t fts_measurements_;
   urcl::vector6d_t tcp_pose_;
+  urcl::vector6d_t tcp_speed_;
   std::bitset<18> actual_dig_out_bits_;
   std::bitset<18> actual_dig_in_bits_;
   std::array<double, 2> standard_analog_input_;
@@ -256,6 +278,7 @@ protected:
   std::bitset<11> safety_status_bits_;
 
   std::unique_ptr<realtime_tools::RealtimePublisher<tf2_msgs::TFMessage>> tcp_pose_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<geometry_msgs::TwistStamped>> tcp_speed_pub_;
   std::unique_ptr<realtime_tools::RealtimePublisher<ur_msgs::IOStates>> io_pub_;
   std::unique_ptr<realtime_tools::RealtimePublisher<ur_msgs::ToolDataMsg>> tool_data_pub_;
   std::unique_ptr<realtime_tools::RealtimePublisher<ur_dashboard_msgs::RobotMode>> robot_mode_pub_;
