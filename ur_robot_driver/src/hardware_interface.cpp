@@ -158,8 +158,10 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
   // message gets published here. So this is equivalent to the information whether the robot accepts
   // commands from ROS side.
   program_state_pub_ = robot_hw_nh.advertise<std_msgs::Bool>("robot_program_running", 10, true);
-  tcp_transform_.header.frame_id = tf_prefix_ + "base";
-  tcp_transform_.child_frame_id = tf_prefix_ + "tool0_controller";
+  actual_tcp_transform_.header.frame_id = tf_prefix_ + "base";
+  actual_tcp_transform_.child_frame_id = tf_prefix_ + "tool0_controller";
+  target_tcp_transform_.header.frame_id = tf_prefix_ + "base";
+  target_tcp_transform_.child_frame_id = tf_prefix_ + "tool0_controller";
 
   // Should the tool's RS485 interface be forwarded to the ROS machine? This is only available on
   // e-Series models. Setting this parameter to TRUE requires multiple other parameters to be set,as
@@ -331,7 +333,7 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
 
   // Register interfaces
   registerInterface(&js_interface_);
-  registerInterface(&target_js_interface_);
+  // registerInterface(&target_js_interface_);
   registerInterface(&spj_interface_);
   registerInterface(&pj_interface_);
   registerInterface(&vj_interface_);
@@ -340,8 +342,9 @@ bool HardwareInterface::init(ros::NodeHandle& root_nh, ros::NodeHandle& robot_hw
   registerInterface(&fts_interface_);
   registerInterface(&robot_status_interface_);
 
-  tcp_pose_pub_.reset(new realtime_tools::RealtimePublisher<tf2_msgs::TFMessage>(root_nh, "/tf", 100));
-  tcp_speed_pub_.reset(new realtime_tools::RealtimePublisher<geometry_msgs::TwistStamped>(root_nh, "/tcp_speed", 100));
+  ur_log_pub_.reset(new realtime_tools::RealtimePublisher<ur_msgs::URLog>(root_nh, "/ur_log", 100));
+  actual_tcp_pose_pub_.reset(new realtime_tools::RealtimePublisher<tf2_msgs::TFMessage>(root_nh, "/tf", 100));
+  actual_tcp_speed_pub_.reset(new realtime_tools::RealtimePublisher<geometry_msgs::TwistStamped>(root_nh, "/tcp_speed", 100));
   io_pub_.reset(new realtime_tools::RealtimePublisher<ur_msgs::IOStates>(robot_hw_nh, "io_states", 1));
   io_pub_->msg_.digital_in_states.resize(actual_dig_in_bits_.size());
   io_pub_->msg_.digital_out_states.resize(actual_dig_out_bits_.size());
@@ -459,8 +462,10 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
     readData(data_pkg, "speed_scaling", speed_scaling_);
     readData(data_pkg, "runtime_state", runtime_state_);
     readData(data_pkg, "actual_TCP_force", fts_measurements_);
-    readData(data_pkg, "actual_TCP_pose", tcp_pose_);
-    readData(data_pkg, "actual_TCP_speed", tcp_speed_);
+    readData(data_pkg, "actual_TCP_pose", actual_tcp_pose_);
+    readData(data_pkg, "actual_TCP_speed", actual_tcp_speed_);
+    readData(data_pkg, "target_TCP_pose", target_tcp_pose_);
+    readData(data_pkg, "target_TCP_speed", target_tcp_speed_);
     readData(data_pkg, "standard_analog_input0", standard_analog_input_[0]);
     readData(data_pkg, "standard_analog_input1", standard_analog_input_[1]);
     readData(data_pkg, "standard_analog_output0", standard_analog_output_[0]);
@@ -484,15 +489,16 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
 
     extractRobotStatus();
 
-    publishIOData();
-    publishToolData();
+    // publishIOData();
+    // publishToolData();
 
     // Transform fts measurements to tool frame
     extractToolPose(time);
-    transformForceTorque();
-    publishPose();
-    publishVelocity(time);
-    publishRobotAndSafetyMode();
+    // transformForceTorque();
+    // publishPose();
+    // publishVelocity(time);
+    // publishRobotAndSafetyMode();
+    publishLog(time);
 
     // pausing state follows runtime state when pausing
     if (runtime_state_ == static_cast<uint32_t>(rtde::RUNTIME_STATE::PAUSED))
@@ -660,7 +666,7 @@ void HardwareInterface::transformForceTorque()
   tcp_torque_.setValue(fts_measurements_[3], fts_measurements_[4], fts_measurements_[5]);
 
   tf2::Quaternion rotation_quat;
-  tf2::fromMsg(tcp_transform_.transform.rotation, rotation_quat);
+  tf2::fromMsg(actual_tcp_transform_.transform.rotation, rotation_quat);
   tcp_force_ = tf2::quatRotate(rotation_quat.inverse(), tcp_force_);
   tcp_torque_ = tf2::quatRotate(rotation_quat.inverse(), tcp_torque_);
 
@@ -700,53 +706,127 @@ bool HardwareInterface::shouldResetControllers()
 
 void HardwareInterface::extractToolPose(const ros::Time& timestamp)
 {
-  double tcp_angle = std::sqrt(std::pow(tcp_pose_[3], 2) + std::pow(tcp_pose_[4], 2) + std::pow(tcp_pose_[5], 2));
-
-  tf2::Vector3 rotation_vec(tcp_pose_[3], tcp_pose_[4], tcp_pose_[5]);
-  tf2::Quaternion rotation;
-  if (tcp_angle > 1e-16)
+  // Actual TCP
   {
-    rotation.setRotation(rotation_vec.normalized(), tcp_angle);
-  }
-  else
-  {
-    rotation.setValue(0.0, 0.0, 0.0, 1.0);  // default Quaternion is 0,0,0,0 which is invalid
-  }
-  tcp_transform_.header.stamp = timestamp;
-  tcp_transform_.transform.translation.x = tcp_pose_[0];
-  tcp_transform_.transform.translation.y = tcp_pose_[1];
-  tcp_transform_.transform.translation.z = tcp_pose_[2];
+    double actual_tcp_angle = std::sqrt(std::pow(actual_tcp_pose_[3], 2) + std::pow(actual_tcp_pose_[4], 2) + std::pow(actual_tcp_pose_[5], 2));
 
-  tcp_transform_.transform.rotation = tf2::toMsg(rotation);
+    tf2::Vector3 rotation_vec(actual_tcp_pose_[3], actual_tcp_pose_[4], actual_tcp_pose_[5]);
+    tf2::Quaternion rotation;
+    if (actual_tcp_angle > 1e-16)
+    {
+      rotation.setRotation(rotation_vec.normalized(), actual_tcp_angle);
+    }
+    else
+    {
+      rotation.setValue(0.0, 0.0, 0.0, 1.0);  // default Quaternion is 0,0,0,0 which is invalid
+    }
+    actual_tcp_transform_.header.stamp = timestamp;
+    actual_tcp_transform_.transform.translation.x = actual_tcp_pose_[0];
+    actual_tcp_transform_.transform.translation.y = actual_tcp_pose_[1];
+    actual_tcp_transform_.transform.translation.z = actual_tcp_pose_[2];
+
+    actual_tcp_transform_.transform.rotation = tf2::toMsg(rotation);
+  }
+
+  // Target TCP
+  {
+    double target_tcp_angle = std::sqrt(std::pow(target_tcp_pose_[3], 2) + std::pow(target_tcp_pose_[4], 2) + std::pow(target_tcp_pose_[5], 2));
+
+    tf2::Vector3 rotation_vec(target_tcp_pose_[3], target_tcp_pose_[4], target_tcp_pose_[5]);
+    tf2::Quaternion rotation;
+    if (target_tcp_angle > 1e-16)
+    {
+      rotation.setRotation(rotation_vec.normalized(), target_tcp_angle);
+    }
+    else
+    {
+      rotation.setValue(0.0, 0.0, 0.0, 1.0);  // default Quaternion is 0,0,0,0 which is invalid
+    }
+    target_tcp_transform_.header.stamp = timestamp;
+    target_tcp_transform_.transform.translation.x = target_tcp_pose_[0];
+    target_tcp_transform_.transform.translation.y = target_tcp_pose_[1];
+    target_tcp_transform_.transform.translation.z = target_tcp_pose_[2];
+
+    target_tcp_transform_.transform.rotation = tf2::toMsg(rotation);
+  }
+
 }
 
 void HardwareInterface::publishPose()
 {
-  if (tcp_pose_pub_)
+  if (actual_tcp_pose_pub_)
   {
-    if (tcp_pose_pub_->trylock())
+    if (actual_tcp_pose_pub_->trylock())
     {
-      tcp_pose_pub_->msg_.transforms.clear();
-      tcp_pose_pub_->msg_.transforms.push_back(tcp_transform_);
-      tcp_pose_pub_->unlockAndPublish();
+      actual_tcp_pose_pub_->msg_.transforms.clear();
+      actual_tcp_pose_pub_->msg_.transforms.push_back(actual_tcp_transform_);
+      actual_tcp_pose_pub_->unlockAndPublish();
     }
   }
 }
 
 void HardwareInterface::publishVelocity(const ros::Time& timestamp)
 {
-  if (tcp_speed_pub_)
+  if (actual_tcp_speed_pub_)
   {
-    if (tcp_speed_pub_->trylock())
+    if (actual_tcp_speed_pub_->trylock())
     {
-      tcp_speed_pub_->msg_.header.stamp = timestamp;
-      tcp_speed_pub_->msg_.twist.linear.x = tcp_speed_[0];
-      tcp_speed_pub_->msg_.twist.linear.y = tcp_speed_[1];
-      tcp_speed_pub_->msg_.twist.linear.z = tcp_speed_[2];
-      tcp_speed_pub_->msg_.twist.angular.x = tcp_speed_[3];
-      tcp_speed_pub_->msg_.twist.angular.y = tcp_speed_[4];
-      tcp_speed_pub_->msg_.twist.angular.z = tcp_speed_[5];
-      tcp_speed_pub_->unlockAndPublish();
+      actual_tcp_speed_pub_->msg_.header.stamp = timestamp;
+      actual_tcp_speed_pub_->msg_.twist.linear.x = actual_tcp_speed_[0];
+      actual_tcp_speed_pub_->msg_.twist.linear.y = actual_tcp_speed_[1];
+      actual_tcp_speed_pub_->msg_.twist.linear.z = actual_tcp_speed_[2];
+      actual_tcp_speed_pub_->msg_.twist.angular.x = actual_tcp_speed_[3];
+      actual_tcp_speed_pub_->msg_.twist.angular.y = actual_tcp_speed_[4];
+      actual_tcp_speed_pub_->msg_.twist.angular.z = actual_tcp_speed_[5];
+      actual_tcp_speed_pub_->unlockAndPublish();
+    }
+  }
+}
+
+void HardwareInterface::publishLog(const ros::Time& timestamp)
+{
+  if (ur_log_pub_)
+  {
+    if (ur_log_pub_->trylock())
+    {
+      // Set Header time
+      ur_log_pub_->msg_.header.stamp = timestamp;
+
+      // Set Actual TCP Speed
+      ur_log_pub_->msg_.actual_tcp_speed.linear.x = actual_tcp_speed_[0];
+      ur_log_pub_->msg_.actual_tcp_speed.linear.y = actual_tcp_speed_[1];
+      ur_log_pub_->msg_.actual_tcp_speed.linear.z = actual_tcp_speed_[2];
+      ur_log_pub_->msg_.actual_tcp_speed.angular.x = actual_tcp_speed_[3];
+      ur_log_pub_->msg_.actual_tcp_speed.angular.y = actual_tcp_speed_[4];
+      ur_log_pub_->msg_.actual_tcp_speed.angular.z = actual_tcp_speed_[5];
+
+      // Set Target TCP Speed
+      ur_log_pub_->msg_.target_tcp_speed.linear.x = target_tcp_speed_[0];
+      ur_log_pub_->msg_.target_tcp_speed.linear.y = target_tcp_speed_[1];
+      ur_log_pub_->msg_.target_tcp_speed.linear.z = target_tcp_speed_[2];
+      ur_log_pub_->msg_.target_tcp_speed.angular.x = target_tcp_speed_[3];
+      ur_log_pub_->msg_.target_tcp_speed.angular.y = target_tcp_speed_[4];
+      ur_log_pub_->msg_.target_tcp_speed.angular.z = target_tcp_speed_[5];
+
+      // Set Actual and Target TCP Pose
+      ur_log_pub_->msg_.actual_tcp_pose = actual_tcp_transform_.transform;
+      ur_log_pub_->msg_.target_tcp_pose = target_tcp_transform_.transform;
+      
+      // Set Joint States
+      ur_log_pub_->msg_.actual_joint_positions.clear();
+      ur_log_pub_->msg_.target_joint_positions.clear();
+      ur_log_pub_->msg_.actual_joint_velocities.clear();
+      ur_log_pub_->msg_.target_joint_velocities.clear();
+
+      ur_log_pub_->msg_.joint_names = joint_names_;
+      for (int i=0; i<6; i++){
+        ur_log_pub_->msg_.actual_joint_positions.push_back(joint_positions_[i]);
+        ur_log_pub_->msg_.target_joint_positions.push_back(target_joint_positions_[i]);
+        ur_log_pub_->msg_.actual_joint_velocities.push_back(joint_velocities_[i]);
+        ur_log_pub_->msg_.target_joint_velocities.push_back(target_joint_velocities_[i]);
+      }
+
+      ur_log_pub_->unlockAndPublish();
     }
   }
 }

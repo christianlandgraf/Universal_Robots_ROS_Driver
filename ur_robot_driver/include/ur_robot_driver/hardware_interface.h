@@ -45,6 +45,7 @@
 #include <ur_msgs/ToolDataMsg.h>
 #include <ur_msgs/SetIO.h>
 #include <ur_msgs/SetSpeedSliderFraction.h>
+#include <ur_msgs/URLog.h>
 
 #include <ur_controllers/speed_scaling_interface.h>
 #include <ur_controllers/scaled_joint_command_interface.h>
@@ -199,6 +200,13 @@ protected:
   void publishRobotAndSafetyMode();
 
   /*!
+   * \brief Publishes a custom log message
+   *
+   * \param timestamp Timestamp of read data
+   */
+  void publishLog(const ros::Time& timestamp);
+
+  /*!
    * \brief Read and evaluate data in order to set robot status properties for industrial
    *        robot status interface
    */
@@ -252,8 +260,10 @@ protected:
   urcl::vector6d_t target_joint_velocities_;
   urcl::vector6d_t target_joint_efforts_;
   urcl::vector6d_t fts_measurements_;
-  urcl::vector6d_t tcp_pose_;
-  urcl::vector6d_t tcp_speed_;
+  urcl::vector6d_t actual_tcp_pose_;
+  urcl::vector6d_t actual_tcp_speed_;
+  urcl::vector6d_t target_tcp_pose_;
+  urcl::vector6d_t target_tcp_speed_;
   std::bitset<18> actual_dig_out_bits_;
   std::bitset<18> actual_dig_in_bits_;
   std::array<double, 2> standard_analog_input_;
@@ -267,7 +277,8 @@ protected:
   double tool_temperature_;
   tf2::Vector3 tcp_force_;
   tf2::Vector3 tcp_torque_;
-  geometry_msgs::TransformStamped tcp_transform_;
+  geometry_msgs::TransformStamped actual_tcp_transform_;
+  geometry_msgs::TransformStamped target_tcp_transform_;
   double speed_scaling_;
   double target_speed_fraction_;
   double speed_scaling_combined_;
@@ -277,8 +288,9 @@ protected:
   std::bitset<4> robot_status_bits_;
   std::bitset<11> safety_status_bits_;
 
-  std::unique_ptr<realtime_tools::RealtimePublisher<tf2_msgs::TFMessage>> tcp_pose_pub_;
-  std::unique_ptr<realtime_tools::RealtimePublisher<geometry_msgs::TwistStamped>> tcp_speed_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<ur_msgs::URLog>> ur_log_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<tf2_msgs::TFMessage>> actual_tcp_pose_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<geometry_msgs::TwistStamped>> actual_tcp_speed_pub_;
   std::unique_ptr<realtime_tools::RealtimePublisher<ur_msgs::IOStates>> io_pub_;
   std::unique_ptr<realtime_tools::RealtimePublisher<ur_msgs::ToolDataMsg>> tool_data_pub_;
   std::unique_ptr<realtime_tools::RealtimePublisher<ur_dashboard_msgs::RobotMode>> robot_mode_pub_;
