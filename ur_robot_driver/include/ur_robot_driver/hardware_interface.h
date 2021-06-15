@@ -225,6 +225,7 @@ protected:
   ur_controllers::ScaledVelocityJointInterface svj_interface_;
   hardware_interface::ForceTorqueSensorInterface fts_interface_;
 
+  double timestamp;
   urcl::vector6d_t joint_position_command_;
   urcl::vector6d_t joint_velocity_command_;
   urcl::vector6d_t joint_positions_;

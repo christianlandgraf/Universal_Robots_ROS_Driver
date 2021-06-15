@@ -442,6 +442,7 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
   if (data_pkg)
   {
     packet_read_ = true;
+    readData(data_pkg, "timestamp", timestamp);
     readData(data_pkg, "actual_q", joint_positions_);
     readData(data_pkg, "actual_qd", joint_velocities_);
     readData(data_pkg, "target_speed_fraction", target_speed_fraction_);
