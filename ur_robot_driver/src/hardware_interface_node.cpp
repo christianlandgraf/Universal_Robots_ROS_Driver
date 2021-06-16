@@ -131,6 +131,7 @@ int main(int argc, char** argv)
   stopwatch_last = stopwatch_now;
 
   double expected_cycle_time = 1.0 / (static_cast<double>(g_hw_interface->getControlFrequency()));
+  expected_cycle_time += 0.0005;
 
   // Run as fast as possible
   while (ros::ok())
@@ -150,8 +151,8 @@ int main(int argc, char** argv)
     // if (!control_rate.sleep())
     if (period.toSec() > expected_cycle_time)
     {
-      // ROS_WARN_STREAM("Could not keep cycle rate of " << expected_cycle_time * 1000 << "ms");
-      // ROS_WARN_STREAM("Actual cycle time:" << period.toNSec() / 1000000.0 << "ms");
+      ROS_WARN_STREAM("Could not keep cycle rate of " << expected_cycle_time * 1000 << "ms");
+      ROS_WARN_STREAM("Actual cycle time:" << period.toNSec() / 1000000.0 << "ms");
     }
   }
 

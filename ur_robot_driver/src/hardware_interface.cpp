@@ -454,40 +454,41 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
   if (data_pkg)
   {
     packet_read_ = true;
+    readData(data_pkg, "timestamp", ur_timestamp);
     readData(data_pkg, "actual_q", joint_positions_);
     readData(data_pkg, "actual_qd", joint_velocities_);
     readData(data_pkg, "target_q", target_joint_positions_);
     readData(data_pkg, "target_qd", target_joint_velocities_);
-    readData(data_pkg, "target_speed_fraction", target_speed_fraction_);
-    readData(data_pkg, "speed_scaling", speed_scaling_);
-    readData(data_pkg, "runtime_state", runtime_state_);
-    readData(data_pkg, "actual_TCP_force", fts_measurements_);
+    // readData(data_pkg, "target_speed_fraction", target_speed_fraction_);
+    // readData(data_pkg, "speed_scaling", speed_scaling_);
+    // readData(data_pkg, "runtime_state", runtime_state_);
+    // readData(data_pkg, "actual_TCP_force", fts_measurements_);
     readData(data_pkg, "actual_TCP_pose", actual_tcp_pose_);
     readData(data_pkg, "actual_TCP_speed", actual_tcp_speed_);
     readData(data_pkg, "target_TCP_pose", target_tcp_pose_);
     readData(data_pkg, "target_TCP_speed", target_tcp_speed_);
-    readData(data_pkg, "standard_analog_input0", standard_analog_input_[0]);
-    readData(data_pkg, "standard_analog_input1", standard_analog_input_[1]);
-    readData(data_pkg, "standard_analog_output0", standard_analog_output_[0]);
-    readData(data_pkg, "standard_analog_output1", standard_analog_output_[1]);
-    readData(data_pkg, "tool_mode", tool_mode_);
-    readData(data_pkg, "tool_analog_input0", tool_analog_input_[0]);
-    readData(data_pkg, "tool_analog_input1", tool_analog_input_[1]);
-    readData(data_pkg, "tool_output_voltage", tool_output_voltage_);
-    readData(data_pkg, "tool_output_current", tool_output_current_);
-    readData(data_pkg, "tool_temperature", tool_temperature_);
-    readData(data_pkg, "robot_mode", robot_mode_);
-    readData(data_pkg, "safety_mode", safety_mode_);
-    readBitsetData<uint32_t>(data_pkg, "robot_status_bits", robot_status_bits_);
-    readBitsetData<uint32_t>(data_pkg, "safety_status_bits", safety_status_bits_);
-    readData(data_pkg, "actual_current", joint_efforts_);
-    readData(data_pkg, "target_current", target_joint_efforts_);
-    readBitsetData<uint64_t>(data_pkg, "actual_digital_input_bits", actual_dig_in_bits_);
-    readBitsetData<uint64_t>(data_pkg, "actual_digital_output_bits", actual_dig_out_bits_);
-    readBitsetData<uint32_t>(data_pkg, "analog_io_types", analog_io_types_);
-    readBitsetData<uint32_t>(data_pkg, "tool_analog_input_types", tool_analog_input_types_);
+    // readData(data_pkg, "standard_analog_input0", standard_analog_input_[0]);
+    // readData(data_pkg, "standard_analog_input1", standard_analog_input_[1]);
+    // readData(data_pkg, "standard_analog_output0", standard_analog_output_[0]);
+    // readData(data_pkg, "standard_analog_output1", standard_analog_output_[1]);
+    // readData(data_pkg, "tool_mode", tool_mode_);
+    // readData(data_pkg, "tool_analog_input0", tool_analog_input_[0]);
+    // readData(data_pkg, "tool_analog_input1", tool_analog_input_[1]);
+    // readData(data_pkg, "tool_output_voltage", tool_output_voltage_);
+    // readData(data_pkg, "tool_output_current", tool_output_current_);
+    // readData(data_pkg, "tool_temperature", tool_temperature_);
+    // readData(data_pkg, "robot_mode", robot_mode_);
+    // readData(data_pkg, "safety_mode", safety_mode_);
+    // readBitsetData<uint32_t>(data_pkg, "robot_status_bits", robot_status_bits_);
+    // readBitsetData<uint32_t>(data_pkg, "safety_status_bits", safety_status_bits_);
+    // readData(data_pkg, "actual_current", joint_efforts_);
+    // readData(data_pkg, "target_current", target_joint_efforts_);
+    // readBitsetData<uint64_t>(data_pkg, "actual_digital_input_bits", actual_dig_in_bits_);
+    // readBitsetData<uint64_t>(data_pkg, "actual_digital_output_bits", actual_dig_out_bits_);
+    // readBitsetData<uint32_t>(data_pkg, "analog_io_types", analog_io_types_);
+    // readBitsetData<uint32_t>(data_pkg, "tool_analog_input_types", tool_analog_input_types_);
 
-    extractRobotStatus();
+    // extractRobotStatus();
 
     // publishIOData();
     // publishToolData();
@@ -500,40 +501,40 @@ void HardwareInterface::read(const ros::Time& time, const ros::Duration& period)
     // publishRobotAndSafetyMode();
     publishLog(time);
 
-    // pausing state follows runtime state when pausing
-    if (runtime_state_ == static_cast<uint32_t>(rtde::RUNTIME_STATE::PAUSED))
-    {
-      pausing_state_ = PausingState::PAUSED;
-    }
-    // When the robot resumed program execution and pausing state was PAUSED, we enter RAMPUP
-    else if (runtime_state_ == static_cast<uint32_t>(rtde::RUNTIME_STATE::PLAYING) &&
-             pausing_state_ == PausingState::PAUSED)
-    {
-      speed_scaling_combined_ = 0.0;
-      pausing_state_ = PausingState::RAMPUP;
-    }
+    // // pausing state follows runtime state when pausing
+    // if (runtime_state_ == static_cast<uint32_t>(rtde::RUNTIME_STATE::PAUSED))
+    // {
+    //   pausing_state_ = PausingState::PAUSED;
+    // }
+    // // When the robot resumed program execution and pausing state was PAUSED, we enter RAMPUP
+    // else if (runtime_state_ == static_cast<uint32_t>(rtde::RUNTIME_STATE::PLAYING) &&
+    //          pausing_state_ == PausingState::PAUSED)
+    // {
+    //   speed_scaling_combined_ = 0.0;
+    //   pausing_state_ = PausingState::RAMPUP;
+    // }
 
-    if (pausing_state_ == PausingState::RAMPUP)
-    {
-      double speed_scaling_ramp = speed_scaling_combined_ + pausing_ramp_up_increment_;
-      speed_scaling_combined_ = std::min(speed_scaling_ramp, speed_scaling_ * target_speed_fraction_);
+    // if (pausing_state_ == PausingState::RAMPUP)
+    // {
+    //   double speed_scaling_ramp = speed_scaling_combined_ + pausing_ramp_up_increment_;
+    //   speed_scaling_combined_ = std::min(speed_scaling_ramp, speed_scaling_ * target_speed_fraction_);
 
-      if (speed_scaling_ramp > speed_scaling_ * target_speed_fraction_)
-      {
-        pausing_state_ = PausingState::RUNNING;
-      }
-    }
-    else if (runtime_state_ == static_cast<uint32_t>(rtde::RUNTIME_STATE::RESUMING))
-    {
-      // We have to keep speed scaling on ROS side at 0 during RESUMING to prevent controllers from
-      // continuing to interpolate
-      speed_scaling_combined_ = 0.0;
-    }
-    else
-    {
-      // Normal case
-      speed_scaling_combined_ = speed_scaling_ * target_speed_fraction_;
-    }
+    //   if (speed_scaling_ramp > speed_scaling_ * target_speed_fraction_)
+    //   {
+    //     pausing_state_ = PausingState::RUNNING;
+    //   }
+    // }
+    // else if (runtime_state_ == static_cast<uint32_t>(rtde::RUNTIME_STATE::RESUMING))
+    // {
+    //   // We have to keep speed scaling on ROS side at 0 during RESUMING to prevent controllers from
+    //   // continuing to interpolate
+    //   speed_scaling_combined_ = 0.0;
+    // }
+    // else
+    // {
+    //   // Normal case
+    //   speed_scaling_combined_ = speed_scaling_ * target_speed_fraction_;
+    // }
   }
   else
   {
@@ -791,6 +792,9 @@ void HardwareInterface::publishLog(const ros::Time& timestamp)
     {
       // Set Header time
       ur_log_pub_->msg_.header.stamp = timestamp;
+
+      // UR timestamp
+      ur_log_pub_->msg_.ur_timestamp = ur_timestamp;
 
       // Set Actual TCP Speed
       ur_log_pub_->msg_.actual_tcp_speed.linear.x = actual_tcp_speed_[0];
